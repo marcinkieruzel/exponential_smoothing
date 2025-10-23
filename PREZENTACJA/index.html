@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wygładzanie Wykładnicze - Exponential Smoothing</title>
+    <meta
+      name="description"
+      content="Kompleksowa prezentacja o metodach wygładzania wykładniczego z przykładami w Python statsmodels"
+    />
+
+    <!-- Reveal.js CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reset.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/theme/white.css"
+    />
+
+    <!-- Highlight.js dla kodu -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/highlight/monokai.css"
+    />
+
+    <style>
+      .reveal {
+        font-family: "Montserrat", "Segoe UI", Tahoma, Geneva, Verdana,
+          sans-serif;
+      }
+
+      .reveal h1 {
+        color: #2c3e50;
+        font-size: 2em;
+        font-weight: 700;
+        margin-bottom: 0.2em;
+      }
+
+      .reveal h2 {
+        color: #34495e;
+        font-size: 1.6em;
+        font-weight: 600;
+        margin-bottom: 0.2em;
+      }
+
+      .reveal p {
+        font-size: 0.8em;
+        line-height: 1.6;
+        margin: 0.4em 0;
+        text-align: left;
+      }
+
+      .reveal ul {
+        text-align: left;
+        line-height: 1.8;
+      }
+
+      .reveal li {
+        margin: 0.2em 0;
+        font-size: 0.8em;
+      }
+
+      .reveal pre {
+        width: 100%;
+        font-size: 0.55em;
+        line-height: 1.4;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        background: #2d2d2d;
+        color: #f8f8f2;
+        padding: 20px;
+        border-radius: 5px;
+        margin: 0.8em 0;
+      }
+
+      .reveal pre code {
+        max-height: 500px;
+        overflow: auto;
+      }
+
+      .reveal code {
+        font-family: "Courier New", Courier, monospace;
+        background: #f5f5f5;
+        padding: 2px 6px;
+        border-radius: 3px;
+        color: #e74c3c;
+      }
+
+      .reveal pre code {
+        background: transparent;
+        color: #f8f8f2;
+        padding: 0;
+      }
+
+      .reveal strong {
+        color: #2980b9;
+        font-weight: 600;
+      }
+
+      .reveal table {
+        margin: 1em auto;
+        border-collapse: collapse;
+        font-size: 0.9em;
+      }
+
+      .reveal table th {
+        background: #3498db;
+        color: white;
+        padding: 12px;
+        font-weight: 600;
+      }
+
+      .reveal table td {
+        padding: 10px;
+        border: 1px solid #ddd;
+      }
+
+      .reveal table tr:nth-child(even) {
+        background: #f9f9f9;
+      }
+
+      .reveal .slide-number {
+        background-color: rgba(52, 152, 219, 0.8);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+      }
+
+      /* Niestandardowe style dla slajdów tytułowych */
+      .reveal section.title-slide {
+        text-align: center;
+      }
+
+      .reveal section.title-slide h1 {
+        color: #2c3e50;
+        margin-bottom: 0.3em;
+      }
+
+      .reveal section.title-slide h2 {
+        color: #7f8c8d;
+        font-weight: 400;
+      }
+
+      /* Style dla slajdów z częściami */
+      .reveal section.part-slide {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+      }
+
+      .reveal section.part-slide h1,
+      .reveal section.part-slide h2 {
+        color: white !important;
+      }
+
+      /* Przyciski nawigacyjne */
+      .reveal .controls {
+        color: #3498db;
+      }
+
+      /* Progress bar */
+      .reveal .progress {
+        background: rgba(0, 0, 0, 0.1);
+        color: #3498db;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section class="title-slide">
+          <h1>Wygładzanie Wykładnicze</h1>
+          <h2>Exponential Smoothing</h2>
+          <p>Metody prognozowania szeregów czasowych</p>
+        </section>
+        <section>
+          <h2>Plan prezentacji</h2>
+          <ul>
+            <li>Wprowadzenie do szeregów czasowych</li>
+            <li>Podstawy wygładzania wykładniczego</li>
+            <li>Simple Exponential Smoothing (SES)</li>
+            <li>Metoda Holta (trend liniowy)</li>
+            <li>Metoda Holta-Wintersa (trend i sezonowość)</li>
+            <li>Implementacja w statsmodels</li>
+            <li>Przykłady praktyczne</li>
+            <li>Dobór parametrów i ocena modeli</li>
+          </ul>
+        </section>
+        <section class="part-slide">
+          <h1>Część 1</h1>
+          <h2>Przypomnienie szeregów czasowych</h2>
+        </section>
+        <section>
+          <h2>Czym są szeregi czasowe?</h2>
+          <p>
+            Szereg czasowy to zbiór obserwacji wartości pewnej zmiennej
+            uporządkowanych chronologicznie.
+          </p>
+          <ul>
+            <li>Dane zebrane w równych odstępach czasu</li>
+            <li>Kolejność obserwacji ma kluczowe znaczenie</li>
+            <li>Zależności czasowe między obserwacjami</li>
+            <li>Przykłady: temperatura, ceny akcji, sprzedaż</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Komponenty szeregu czasowego</h2>
+          <ul>
+            <li>
+              <strong>Trend (T)</strong> - długoterminowa tendencja wzrostowa
+              lub spadkowa
+            </li>
+            <li>
+              <strong>Sezonowość (S)</strong> - regularne wzorce powtarzające
+              się w stałych odstępach
+            </li>
+            <li>
+              <strong>Cykl (C)</strong> - długookresowe wahania nieregularne
+            </li>
+            <li>
+              <strong>Składnik losowy (E)</strong> - nieprzewidywalne wahania
+            </li>
+          </ul>
+        </section>
+        <section>
+          <h2>Modele dekompozycji</h2>
+          <p><strong>Model addytywny:</strong></p>
+          <p>Y(t) = T(t) + S(t) + E(t)</p>
+          <p><strong>Model multiplikatywny:</strong></p>
+          <p>Y(t) = T(t) × S(t) × E(t)</p>
+          <p>Wybór modelu zależy od charakteru danych</p>
+        </section>
+        <section>
+          <h2>Po co prognozowanie?</h2>
+          <ul>
+            <li>Planowanie produkcji i zapasów</li>
+            <li>Budżetowanie i planowanie finansowe</li>
+            <li>Prognozowanie popytu</li>
+            <li>Analiza trendów rynkowych</li>
+            <li>Optymalizacja zasobów</li>
+            <li>Podejmowanie decyzji strategicznych</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Metody prognozowania</h2>
+          <p><strong>Metody naiwne:</strong> ostatnia wartość jako prognoza</p>
+          <p>
+            <strong>Średnie:</strong> średnia arytmetyczna, średnia krocząca
+          </p>
+          <p>
+            <strong>Wygładzanie wykładnicze:</strong> wagowane średnie z
+            większym znaczeniem dla nowszych danych
+          </p>
+          <p>
+            <strong>Modele statystyczne:</strong> ARIMA, SARIMA, modele
+            przestrzeni stanów
+          </p>
+        </section>
+        <section class="part-slide">
+          <h1>Część 2</h1>
+          <h2>Podstawy wygładzania wykładniczego</h2>
+        </section>
+        <section>
+          <h2>Idea wygładzania wykładniczego</h2>
+          <p>
+            Wygładzanie wykładnicze polega na przypisywaniu wykładniczo
+            malejących wag historycznym obserwacjom.
+          </p>
+          <ul>
+            <li>Nowsze obserwacje mają większą wagę</li>
+            <li>Starsze obserwacje mają mniejszą wagę</li>
+            <li>Wagi maleją wykładniczo wstecz w czasie</li>
+            <li>Suma wag wynosi 1</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Zalety wygładzania wykładniczego</h2>
+          <ul>
+            <li>Prostota implementacji</li>
+            <li>Niskie wymagania obliczeniowe</li>
+            <li>Małe wymagania pamięciowe</li>
+            <li>Automatyczne adaptowanie do zmian</li>
+            <li>Elastyczność w modelowaniu</li>
+            <li>Dobrze sprawdza się w praktyce</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Wady wygładzania wykładniczego</h2>
+          <ul>
+            <li>Brak podstaw teoretycznych (w przeciwieństwie do ARIMA)</li>
+            <li>Trudność w doborze optymalnych parametrów</li>
+            <li>Problemy z bardzo nieregularnymi danymi</li>
+            <li>Ograniczona zdolność do długoterminowych prognoz</li>
+            <li>Wymaga stacjonarności (w podstawowej wersji)</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Rodzaje wygładzania wykładniczego</h2>
+          <p><strong>Proste (SES):</strong> brak trendu i sezonowości</p>
+          <p><strong>Holt's Linear:</strong> trend liniowy, brak sezonowości</p>
+          <p>
+            <strong>Holt-Winters Additive:</strong> trend i sezonowość addytywna
+          </p>
+          <p>
+            <strong>Holt-Winters Multiplicative:</strong> trend i sezonowość
+            multiplikatywna
+          </p>
+          <p><strong>Holt's Damped:</strong> trend wygaszany</p>
+        </section>
+        <section>
+          <h2>Parametry wygładzania</h2>
+          <p>
+            <strong>α (alpha)</strong> - parametr wygładzania poziomu (0 &lt; α
+            &lt; 1)
+          </p>
+          <p>
+            <strong>β (beta)</strong> - parametr wygładzania trendu (0 &lt; β
+            &lt; 1)
+          </p>
+          <p>
+            <strong>γ (gamma)</strong> - parametr wygładzania sezonowości (0
+            &lt; γ &lt; 1)
+          </p>
+          <p>
+            <strong>φ (phi)</strong> - parametr wygaszania trendu (0 &lt; φ &lt;
+            1)
+          </p>
+        </section>
+        <section>
+          <h2>Interpretacja parametru α</h2>
+          <p>
+            <strong>α bliskie 1:</strong> duża waga dla ostatnich obserwacji,
+            szybka reakcja na zmiany, większe wahania
+          </p>
+          <p>
+            <strong>α bliskie 0:</strong> mała waga dla ostatnich obserwacji,
+            wolna reakcja na zmiany, większe wygładzenie
+          </p>
+          <p>
+            <strong>Wybór α:</strong> kompromis między wygładzeniem a
+            reagowaniem na zmiany
+          </p>
+        </section>
+        <section class="part-slide">
+          <h1>Część 3</h1>
+          <h2>Simple Exponential Smoothing (SES)</h2>
+        </section>
+        <section>
+          <h2>SES - Założenia</h2>
+          <p>Simple Exponential Smoothing stosujemy gdy:</p>
+          <ul>
+            <li>Dane nie wykazują trendu</li>
+            <li>Dane nie wykazują sezonowości</li>
+            <li>Wahania są losowe wokół stałego poziomu</li>
+            <li>Chcemy krótkookresowych prognoz</li>
+          </ul>
+        </section>
+        <section>
+          <h2>SES - Wzór podstawowy</h2>
+          <p>Prognoza na okres t+1:</p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            ŷ(t+1|t) = α·y(t) + (1-α)·ŷ(t|t-1)
+          </p>
+          <p>gdzie:</p>
+          <ul>
+            <li>ŷ(t+1|t) - prognoza na okres t+1</li>
+            <li>y(t) - rzeczywista wartość w okresie t</li>
+            <li>α - parametr wygładzania (0 &lt; α &lt; 1)</li>
+          </ul>
+        </section>
+        <section>
+          <h2>SES - Forma rekurencyjna</h2>
+          <p>Równanie poziomu:</p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            l(t) = α·y(t) + (1-α)·l(t-1)
+          </p>
+          <p>Prognoza:</p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            ŷ(t+h|t) = l(t)
+          </p>
+          <p>
+            Prognoza dla dowolnego horyzontu h jest stała i równa ostatniemu
+            wygładzonemu poziomowi
+          </p>
+        </section>
+        <section>
+          <h2>SES - Forma rozwinięta</h2>
+          <p>Prognoza jako ważona suma wszystkich obserwacji:</p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            ŷ(t+1|t) = α·y(t) + α(1-α)·y(t-1) + α(1-α)²·y(t-2) + ...
+          </p>
+          <p>Wagi maleją wykładniczo:</p>
+          <ul>
+            <li>α dla y(t)</li>
+            <li>α(1-α) dla y(t-1)</li>
+            <li>α(1-α)² dla y(t-2)</li>
+          </ul>
+        </section>
+        <section>
+          <h2>SES - Wartość początkowa</h2>
+          <p>Inicjalizacja modelu - możliwe podejścia:</p>
+          <p><strong>1. Pierwsza obserwacja:</strong> l(0) = y(1)</p>
+          <p>
+            <strong>2. Średnia z kilku pierwszych:</strong> l(0) = mean(y(1:n))
+          </p>
+          <p>
+            <strong>3. Optymalizacja:</strong> dobór l(0) minimalizujący błąd
+          </p>
+          <p>W statsmodels domyślnie używana jest optymalizacja</p>
+        </section>
+        <section>
+          <h2>SES - Przykład kodu Python</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+import pandas as pd
+import numpy as np
+
+data = [100, 105, 98, 102, 110, 
+        108, 107, 111, 109, 112]
+index = pd.date_range('2023-01', 
+                      periods=10, freq='M')
+series = pd.Series(data, index=index)</pre
+          >
+        </section>
+        <section>
+          <h2>SES - Import statsmodels</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+from statsmodels.tsa.holtwinters \
+    import SimpleExpSmoothing
+import matplotlib.pyplot as plt
+
+plt.style.use('seaborn-whitegrid')
+plt.rcParams['figure.figsize'] = (12, 6)</pre
+          >
+        </section>
+        <section>
+          <h2>SES - Dopasowanie modelu</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+model = SimpleExpSmoothing(series)
+
+# Automatyczny dobór α
+fit = model.fit()
+
+print(f'Parametr α: '
+      f'{fit.params["smoothing_level"]:.4f}')
+print(f'Poziom początkowy: '
+      f'{fit.params["initial_level"]:.2f}')</pre
+          >
+        </section>
+        <section>
+          <h2>SES - Prognoza</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+forecast = fit.forecast(steps=3)
+
+print('Prognozy:')
+print(forecast)
+
+# Wszystkie prognozy są takie same
+# bo SES zakłada stały poziom</pre
+          >
+        </section>
+        <section>
+          <h2>SES - Kiedy stosować?</h2>
+          <p><strong>Odpowiednie dla:</strong></p>
+          <ul>
+            <li>Danych bez trendu</li>
+            <li>Stabilnych procesów</li>
+            <li>Krótkich horyzontów prognozy</li>
+            <li>Danych z losowymi wahaniami</li>
+          </ul>
+          <p><strong>Nieodpowiednie dla:</strong></p>
+          <ul>
+            <li>Danych z trendem</li>
+            <li>Danych sezonowych</li>
+            <li>Długich horyzontów prognozy</li>
+          </ul>
+        </section>
+        <section class="part-slide">
+          <h1>Część 4</h1>
+          <h2>Metoda Holta - Trend Liniowy</h2>
+        </section>
+        <section>
+          <h2>Metoda Holta - Założenia</h2>
+          <p>Metoda Holta (Holt's Linear Trend) stosowana jest gdy:</p>
+          <ul>
+            <li>Dane wykazują trend liniowy</li>
+            <li>Brak sezonowości</li>
+            <li>Trend może być rosnący lub malejący</li>
+            <li>Potrzebne są prognozy uwzględniające trend</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Metoda Holta - Równania</h2>
+          <p><strong>Równanie poziomu:</strong></p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            l(t) = α·y(t) + (1-α)·[l(t-1) + b(t-1)]
+          </p>
+          <p><strong>Równanie trendu:</strong></p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            b(t) = β·[l(t) - l(t-1)] + (1-β)·b(t-1)
+          </p>
+          <p><strong>Prognoza:</strong></p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            ŷ(t+h|t) = l(t) + h·b(t)
+          </p>
+        </section>
+        <section>
+          <h2>Holt - Przykład kodu</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+from statsmodels.tsa.holtwinters \
+    import ExponentialSmoothing
+
+data = [100, 105, 110, 118, 125,
+        132, 138, 145, 151, 158]
+series = pd.Series(data, 
+                   index=pd.date_range(
+                       '2023-01', periods=10, freq='M'))</pre
+          >
+        </section>
+        <section>
+          <h2>Holt - Dopasowanie modelu</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+model = ExponentialSmoothing(
+    series,
+    trend='add',
+    seasonal=None
+)
+
+fit = model.fit()
+
+print(f'α: {fit.params["smoothing_level"]:.4f}')
+print(f'β: {fit.params["smoothing_trend"]:.4f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Holt - Prognoza</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+forecast = fit.forecast(steps=6)
+
+for i, value in enumerate(forecast, 1):
+    print(f'Okres t+{i}: {value:.2f}')
+
+# Prognozy rosną liniowo
+# zgodnie z trendem</pre
+          >
+        </section>
+        <section>
+          <h2>Holt Damped - Trend wygaszany</h2>
+          <p>Modyfikacja metody Holta z wygaszanym trendem:</p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            b(t) = β·[l(t) - l(t-1)] + (1-β)·φ·b(t-1)
+          </p>
+          <p style="font-family: monospace; background: #f0f0f0; padding: 10px">
+            ŷ(t+h|t) = l(t) + (φ + φ² + ... + φ^h)·b(t)
+          </p>
+          <p>Parametr φ (0 &lt; φ &lt; 1) kontroluje tempo wygaszania trendu</p>
+        </section>
+        <section>
+          <h2>Holt Damped - Implementacja</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+model_damped = ExponentialSmoothing(
+    series,
+    trend='add',
+    seasonal=None,
+    damped_trend=True
+)
+
+fit_damped = model_damped.fit()
+
+print(f'φ (damping): '
+      f'{fit_damped.params["damping_trend"]:.4f}')</pre
+          >
+        </section>
+        <section class="part-slide">
+          <h1>Część 5</h1>
+          <h2>Metoda Holta-Wintersa</h2>
+        </section>
+        <section>
+          <h2>Holt-Winters - Wprowadzenie</h2>
+          <p>
+            Metoda Holta-Wintersa rozszerza metodę Holta o komponent sezonowy.
+          </p>
+          <p><strong>Dwa warianty:</strong></p>
+          <ul>
+            <li>
+              Sezonowość addytywna - gdy amplituda wahań sezonowych jest stała
+            </li>
+            <li>
+              Sezonowość multiplikatywna - gdy amplituda rośnie z poziomem
+              szeregu
+            </li>
+          </ul>
+        </section>
+        <section>
+          <h2>Holt-Winters Additive - Równania</h2>
+          <p>
+            <strong>Poziom:</strong> l(t) = α·[y(t) - s(t-m)] + (1-α)·[l(t-1) +
+            b(t-1)]
+          </p>
+          <p><strong>Trend:</strong> b(t) = β·[l(t) - l(t-1)] + (1-β)·b(t-1)</p>
+          <p>
+            <strong>Sezonowość:</strong> s(t) = γ·[y(t) - l(t)] + (1-γ)·s(t-m)
+          </p>
+          <p><strong>Prognoza:</strong> ŷ(t+h|t) = l(t) + h·b(t) + s(t+h-m)</p>
+        </section>
+        <section>
+          <h2>Holt-Winters Multiplicative - Równania</h2>
+          <p>
+            <strong>Poziom:</strong> l(t) = α·[y(t) / s(t-m)] + (1-α)·[l(t-1) +
+            b(t-1)]
+          </p>
+          <p><strong>Trend:</strong> b(t) = β·[l(t) - l(t-1)] + (1-β)·b(t-1)</p>
+          <p>
+            <strong>Sezonowość:</strong> s(t) = γ·[y(t) / l(t)] + (1-γ)·s(t-m)
+          </p>
+          <p><strong>Prognoza:</strong> ŷ(t+h|t) = [l(t) + h·b(t)]·s(t+h-m)</p>
+        </section>
+        <section>
+          <h2>Parametry Holt-Winters</h2>
+          <p>
+            <strong>α (alpha)</strong> - wygładzanie poziomu (0 &lt; α &lt; 1)
+          </p>
+          <p>
+            <strong>β (beta)</strong> - wygładzanie trendu (0 &lt; β &lt; 1)
+          </p>
+          <p>
+            <strong>γ (gamma)</strong> - wygładzanie sezonowości (0 &lt; γ &lt;
+            1)
+          </p>
+          <p><strong>m</strong> - długość okresu sezonowego</p>
+          <ul>
+            <li>m = 4 dla danych kwartalnych</li>
+            <li>m = 12 dla danych miesięcznych</li>
+            <li>m = 24 dla danych godzinowych</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Wybór modelu: addytywny vs multiplikatywny</h2>
+          <p><strong>Model addytywny:</strong></p>
+          <ul>
+            <li>Wahania sezonowe mają stałą amplitudę</li>
+            <li>Różnice między sezonami są stałe</li>
+          </ul>
+          <p><strong>Model multiplikatywny:</strong></p>
+          <ul>
+            <li>Wahania sezonowe rosną z poziomem szeregu</li>
+            <li>Proporcje między sezonami są stałe</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Holt-Winters - Generowanie danych</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+np.random.seed(42)
+months = pd.date_range('2022-01', 
+                       periods=36, freq='M')
+
+trend = np.arange(36) * 2
+seasonality = 10 * np.sin(
+    2 * np.pi * np.arange(36) / 12)
+noise = np.random.randn(36) * 2
+sales = 100 + trend + seasonality + noise
+
+series = pd.Series(sales, index=months)</pre
+          >
+        </section>
+        <section>
+          <h2>Holt-Winters Additive - Dopasowanie</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+model_add = ExponentialSmoothing(
+    series,
+    trend='add',
+    seasonal='add',
+    seasonal_periods=12
+)
+
+fit_add = model_add.fit()
+
+print(f'α: {fit_add.params["smoothing_level"]:.4f}')
+print(f'β: {fit_add.params["smoothing_trend"]:.4f}')
+print(f'γ: {fit_add.params["smoothing_seasonal"]:.4f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Holt-Winters Multiplicative - Dopasowanie</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+model_mul = ExponentialSmoothing(
+    series,
+    trend='add',
+    seasonal='mul',
+    seasonal_periods=12
+)
+
+fit_mul = model_mul.fit()
+
+print(f'α: {fit_mul.params["smoothing_level"]:.4f}')
+print(f'β: {fit_mul.params["smoothing_trend"]:.4f}')
+print(f'γ: {fit_mul.params["smoothing_seasonal"]:.4f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Holt-Winters - Składniki modelu</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+print('Poziom (ostatnie 5):')
+print(fit_add.level.tail())
+
+print('Trend (ostatnie 5):')
+print(fit_add.trend.tail())
+
+print('Sezonowość (12 okresów):')
+print(fit_add.season[:12])</pre
+          >
+        </section>
+        <section>
+          <h2>Holt-Winters - Prognoza</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+forecast_add = fit_add.forecast(steps=12)
+forecast_mul = fit_mul.forecast(steps=12)
+
+print('Prognozy (addytywny):')
+print(forecast_add)
+
+print('Prognozy (multiplikatywny):')
+print(forecast_mul)</pre
+          >
+        </section>
+        <section>
+          <h2>Holt-Winters - Porównanie modeli</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+print('Porównanie modeli:')
+print(f'SSE Add: {fit_add.sse:.2f}')
+print(f'SSE Mul: {fit_mul.sse:.2f}')
+print(f'AIC Add: {fit_add.aic:.2f}')
+print(f'AIC Mul: {fit_mul.aic:.2f}')
+print(f'BIC Add: {fit_add.bic:.2f}')
+print(f'BIC Mul: {fit_mul.bic:.2f}')
+
+# Niższe wartości są lepsze</pre
+          >
+        </section>
+        <section class="part-slide">
+          <h1>Część 6</h1>
+          <h2>Implementacja w statsmodels</h2>
+        </section>
+        <section>
+          <h2>Klasy w statsmodels</h2>
+          <p><strong>SimpleExpSmoothing</strong> - tylko dla SES</p>
+          <pre style="text-align: left">
+from statsmodels.tsa.holtwinters \
+    import SimpleExpSmoothing</pre
+          >
+          <p><strong>ExponentialSmoothing</strong> - dla wszystkich metod</p>
+          <pre style="text-align: left">
+from statsmodels.tsa.holtwinters \
+    import ExponentialSmoothing</pre
+          >
+          <p>Uniwersalna klasa pozwala kontrolować wszystkie komponenty</p>
+        </section>
+        <section>
+          <h2>Parametry konstruktora</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+model = ExponentialSmoothing(
+    endog,              # dane (Series/array)
+    trend=None,         # None, 'add', 'mul'
+    damped_trend=False, # True/False
+    seasonal=None,      # None, 'add', 'mul'
+    seasonal_periods=None, # np. 12
+    initialization_method='estimated',
+    initial_level=None,
+    initial_trend=None,
+    initial_seasonal=None
+)</pre
+          >
+        </section>
+        <section>
+          <h2>Metoda fit() - parametry</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+fit = model.fit(
+    smoothing_level=None,     # α
+    smoothing_trend=None,     # β
+    smoothing_seasonal=None,  # γ
+    damping_trend=None,       # φ
+    optimized=True,
+    use_brute=True,
+    remove_bias=False,
+    use_boxcox=False
+)</pre
+          >
+        </section>
+        <section>
+          <h2>Obiekt wyniku - atrybuty</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+fit.params           # parametry
+fit.fittedvalues     # wartości dopasowane
+fit.resid            # reszty
+fit.level            # wygładzone poziomy
+fit.trend            # wygładzone trendy
+fit.season           # sezonowość
+fit.sse              # suma kwadratów błędów
+fit.aic              # AIC
+fit.bic              # BIC
+fit.aicc             # skorygowane AIC</pre
+          >
+        </section>
+        <section>
+          <h2>Metody obiektu wyniku</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+# Prognoza
+forecast = fit.forecast(steps=10)
+
+# Prognoza z indeksami
+predict = fit.predict(
+    start=len(series),
+    end=len(series)+9
+)
+
+# Symulacja
+simulated = fit.simulate(
+    nsimulations=100,
+    anchor='end'
+)</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład pełnego workflow</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+# 1. Wczytanie danych
+series = pd.read_csv('data.csv', 
+                     index_col=0, parse_dates=True)
+
+# 2. Podział train/test
+train = series[:-12]
+test = series[-12:]
+
+# 3. Model
+model = ExponentialSmoothing(train, 
+    trend='add', seasonal='add', seasonal_periods=12)
+
+# 4. Dopasowanie
+fit = model.fit()
+
+# 5. Prognoza
+forecast = fit.forecast(12)</pre
+          >
+        </section>
+        <section>
+          <h2>Walidacja krzyżowa</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+from sklearn.model_selection import TimeSeriesSplit
+
+tscv = TimeSeriesSplit(n_splits=5)
+rmse_scores = []
+
+for train_idx, test_idx in tscv.split(series):
+    train = series.iloc[train_idx]
+    test = series.iloc[test_idx]
+    
+    model = ExponentialSmoothing(train, 
+        trend='add', seasonal='add', seasonal_periods=12)
+    fit = model.fit()
+    forecast = fit.forecast(len(test))
+    
+    rmse = np.sqrt(((test - forecast) ** 2).mean())
+    rmse_scores.append(rmse)</pre
+          >
+        </section>
+        <section>
+          <h2>Grid Search - dobór parametrów</h2>
+          <pre style="text-align: left; font-size: 0.65em">
+trend_options = ['add', None]
+seasonal_options = ['add', 'mul', None]
+
+results = []
+for trend, seasonal in itertools.product(
+    trend_options, seasonal_options):
+    if seasonal and not seasonal_periods:
+        continue
+    
+    try:
+        model = ExponentialSmoothing(
+            train, trend=trend, seasonal=seasonal, 
+            seasonal_periods=12)
+        fit = model.fit()
+        results.append({
+            'trend': trend, 'seasonal': seasonal,
+            'aic': fit.aic, 'bic': fit.bic
+        })
+    except:
+        pass
+
+results_df = pd.DataFrame(results).sort_values('aic')</pre
+          >
+        </section>
+        <section class="part-slide">
+          <h1>Część 7</h1>
+          <h2>Przykłady praktyczne</h2>
+        </section>
+        <section>
+          <h2>Przykład 1: Temperatura miasta</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+# Załaduj dane temperatury
+temp = pd.read_csv('temperature.csv', 
+                   parse_dates=['datetime'])
+temp.set_index('datetime', inplace=True)
+
+# Wybierz miasto
+boston = temp['Boston'].dropna()
+
+print(f'Zakres: {boston.index.min()} '
+      f'do {boston.index.max()}')
+print(f'Obserwacji: {len(boston)}')</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 1: Agregacja dziennych średnich</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+# Agregacja do średnich dziennych
+boston_daily = boston.resample('D').mean()
+
+print(f'Liczba dni: {len(boston_daily)}')
+
+# Wizualizacja
+plt.figure(figsize=(14, 6))
+plt.plot(boston_daily)
+plt.title('Średnia dzienna temperatura')
+plt.grid(True)
+plt.show()</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 1: Model z sezonowością roczną</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+train_size = len(boston_daily) - 30
+train = boston_daily[:train_size]
+test = boston_daily[train_size:]
+
+# Model z sezonowością roczną (365 dni)
+model = ExponentialSmoothing(
+    train,
+    trend='add',
+    seasonal='add',
+    seasonal_periods=365
+)
+
+fit = model.fit()
+forecast = fit.forecast(30)</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 2: Ceny złota</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+gold = pd.read_csv('xauusd_d.csv', 
+                   parse_dates=['Data'])
+gold.set_index('Data', inplace=True)
+gold = gold['Zamkniecie']
+
+gold_recent = gold[gold.index >= '2023-01-01']
+
+plt.figure(figsize=(14, 6))
+plt.plot(gold_recent)
+plt.title('Cena złota (XAU/USD)')
+plt.show()</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 2: Model dla cen złota</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+# Złoto: trend ale nie sezonowość
+train = gold_recent[:-30]
+test = gold_recent[-30:]
+
+# Porównanie modeli
+model_ses = SimpleExpSmoothing(train).fit()
+model_holt = ExponentialSmoothing(
+    train, trend='add').fit()
+model_damped = ExponentialSmoothing(
+    train, trend='add', damped_trend=True).fit()
+
+forecast_ses = model_ses.forecast(30)
+forecast_holt = model_holt.forecast(30)
+forecast_damped = model_damped.forecast(30)</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 3: Sprzedaż produktu</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+np.random.seed(123)
+months = pd.date_range('2020-01', periods=48, freq='M')
+
+# Trend + sezonowość + szum + święta
+trend = np.arange(48) * 5
+seasonality = 50 * np.sin(2 * np.pi * np.arange(48) / 12)
+holiday_spike = np.zeros(48)
+holiday_spike[11::12] = 100  # Grudzień
+noise = np.random.randn(48) * 10
+
+sales = 500 + trend + seasonality + holiday_spike + noise
+sales_series = pd.Series(sales, index=months)</pre
+          >
+        </section>
+        <section>
+          <h2>Przykład 3: Prognoza sprzedaży</h2>
+          <pre style="text-align: left; font-size: 0.8em">
+train = sales_series[:-6]
+test = sales_series[-6:]
+
+model = ExponentialSmoothing(
+    train,
+    trend='add',
+    seasonal='add',
+    seasonal_periods=12
+)
+
+fit = model.fit()
+forecast = fit.forecast(6)
+
+plt.plot(test, label='Test', marker='o')
+plt.plot(forecast, label='Prognoza')
+plt.legend()
+plt.show()</pre
+          >
+        </section>
+        <section class="part-slide">
+          <h1>Część 8</h1>
+          <h2>Dobór parametrów i ocena modeli</h2>
+        </section>
+        <section>
+          <h2>Metryki oceny jakości</h2>
+          <p><strong>MAE (Mean Absolute Error):</strong></p>
+          <p>MAE = (1/n) * Σ|y(i) - ŷ(i)|</p>
+          <p><strong>RMSE (Root Mean Squared Error):</strong></p>
+          <p>RMSE = sqrt[(1/n) * Σ(y(i) - ŷ(i))²]</p>
+          <p><strong>MAPE (Mean Absolute Percentage Error):</strong></p>
+          <p>MAPE = (100/n) * Σ|[y(i) - ŷ(i)] / y(i)|</p>
+        </section>
+        <section>
+          <h2>Implementacja metryk</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+def calculate_metrics(actual, predicted):
+    mae = np.mean(np.abs(actual - predicted))
+    rmse = np.sqrt(np.mean(
+        (actual - predicted) ** 2))
+    mape = np.mean(np.abs(
+        (actual - predicted) / actual)) * 100
+    
+    return {'MAE': mae, 'RMSE': rmse, 
+            'MAPE': mape}
+
+metrics = calculate_metrics(test, forecast)
+for key, value in metrics.items():
+    print(f'{key}: {value:.2f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Kryteria informacyjne</h2>
+          <p><strong>AIC (Akaike Information Criterion):</strong></p>
+          <p>AIC = -2*log(L) + 2*k</p>
+          <p><strong>BIC (Bayesian Information Criterion):</strong></p>
+          <p>BIC = -2*log(L) + k*log(n)</p>
+          <p>
+            gdzie L to likelihood, k to liczba parametrów, n to liczba
+            obserwacji
+          </p>
+          <p>Niższe wartości wskazują lepszy model</p>
+        </section>
+        <section>
+          <h2>Porównanie modeli</h2>
+          <pre style="text-align: left; font-size: 0.65em">
+configurations = [
+    {'trend': None, 'seasonal': None, 'name': 'SES'},
+    {'trend': 'add', 'seasonal': None, 'name': 'Holt'},
+    {'trend': 'add', 'seasonal': 'add', 'name': 'HW Add'},
+    {'trend': 'add', 'seasonal': 'mul', 'name': 'HW Mul'},
+]
+
+for config in configurations:
+    model = ExponentialSmoothing(train,
+        trend=config.get('trend'),
+        seasonal=config.get('seasonal'),
+        seasonal_periods=12 if config.get('seasonal') else None)
+    fit = model.fit()
+    forecast = fit.forecast(len(test))
+    rmse = np.sqrt(((test - forecast) ** 2).mean())
+    print(f'{config["name"]}: RMSE={rmse:.2f}, AIC={fit.aic:.2f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Analiza reszt - testy diagnostyczne</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+from scipy import stats
+
+residuals = fit.resid
+
+# Test normalności (Shapiro-Wilk)
+statistic, p_value = stats.shapiro(residuals)
+print(f'Test Shapiro-Wilk: {statistic:.4f}, '
+      f'p={p_value:.4f}')
+
+# Test autokorelacji (Ljung-Box)
+from statsmodels.stats.diagnostic import acorr_ljungbox
+lb_test = acorr_ljungbox(residuals, lags=10)
+print(f'Test Ljung-Box (lag 10): '
+      f'p={lb_test["lb_pvalue"].iloc[9]:.4f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Optymalizacja parametrów</h2>
+          <pre style="text-align: left; font-size: 0.7em">
+# Grid search dla α
+alphas = np.arange(0.1, 1.0, 0.1)
+rmse_results = []
+
+for alpha in alphas:
+    model = SimpleExpSmoothing(train)
+    fit = model.fit(smoothing_level=alpha, 
+                    optimized=False)
+    forecast = fit.forecast(len(test))
+    rmse = np.sqrt(((test - forecast) ** 2).mean())
+    rmse_results.append({'alpha': alpha, 
+                         'RMSE': rmse})
+
+results_df = pd.DataFrame(rmse_results)
+best_alpha = results_df.loc[
+    results_df['RMSE'].idxmin(), 'alpha']</pre
+          >
+        </section>
+        <section>
+          <h2>Kiedy stosować wygładzanie wykładnicze?</h2>
+          <p><strong>Zalety:</strong></p>
+          <ul>
+            <li>Prostota i szybkość obliczeń</li>
+            <li>Dobrze radzi sobie z krótkimi szeregami</li>
+            <li>Automatyczna adaptacja do zmian</li>
+            <li>Niskie wymagania pamięciowe</li>
+          </ul>
+          <p><strong>Ograniczenia:</strong></p>
+          <ul>
+            <li>Problemy z długimi horyzontami prognozy</li>
+            <li>Wymaga regularnych odstępów czasowych</li>
+            <li>Nie radzi sobie ze zmianami strukturalnymi</li>
+            <li>Ograniczone możliwości modelowania złożonych zależności</li>
+          </ul>
+        </section>
+        <section>
+          <h1>Podsumowanie</h1>
+        </section>
+        <section>
+          <h2>Wybór odpowiedniej metody</h2>
+          <table style="font-size: 0.85em">
+            <tr>
+              <th>Charakterystyka danych</th>
+              <th>Metoda</th>
+            </tr>
+            <tr>
+              <td>Brak trendu, brak sezonowości</td>
+              <td>Simple Exponential Smoothing</td>
+            </tr>
+            <tr>
+              <td>Trend liniowy, brak sezonowości</td>
+              <td>Holt's Linear Trend</td>
+            </tr>
+            <tr>
+              <td>Trend + sezonowość stała</td>
+              <td>Holt-Winters Additive</td>
+            </tr>
+            <tr>
+              <td>Trend + sezonowość rosnąca</td>
+              <td>Holt-Winters Multiplicative</td>
+            </tr>
+            <tr>
+              <td>Trend wygaszany</td>
+              <td>Holt Damped</td>
+            </tr>
+          </table>
+        </section>
+        <section>
+          <h2>Kluczowe wskazówki</h2>
+          <ul>
+            <li>Zawsze wizualizuj dane przed modelowaniem</li>
+            <li>Sprawdź obecność trendu i sezonowości</li>
+            <li>Podziel dane na zbiór treningowy i testowy</li>
+            <li>Porównaj kilka konfiguracji modelu</li>
+            <li>Analizuj reszty modelu</li>
+            <li>Używaj przedziałów ufności w prognozach</li>
+            <li>Regularnie aktualizuj model nowymi danymi</li>
+          </ul>
+        </section>
+        <section>
+          <h2>Najważniejsze parametry</h2>
+          <p>
+            <strong>α (smoothing_level)</strong> - kontroluje reaktywność na
+            zmiany poziomu
+          </p>
+          <p>
+            <strong>β (smoothing_trend)</strong> - kontroluje reaktywność na
+            zmiany trendu
+          </p>
+          <p>
+            <strong>γ (smoothing_seasonal)</strong> - kontroluje reaktywność na
+            zmiany sezonowości
+          </p>
+          <p><strong>seasonal_periods</strong> - długość cyklu sezonowego</p>
+          <p><strong>damped_trend</strong> - czy trend ma być wygaszany</p>
+        </section>
+        <section>
+          <h2>Statsmodels - podstawowe użycie</h2>
+          <pre style="text-align: left; font-size: 0.75em">
+from statsmodels.tsa.holtwinters \
+    import ExponentialSmoothing
+
+# 1. Przygotuj dane
+# 2. Utwórz model
+model = ExponentialSmoothing(
+    series, trend='add', seasonal='add', 
+    seasonal_periods=12)
+
+# 3. Dopasuj
+fit = model.fit()
+
+# 4. Prognozuj
+forecast = fit.forecast(steps=12)
+
+# 5. Oceń
+print(f'AIC: {fit.aic:.2f}, BIC: {fit.bic:.2f}')</pre
+          >
+        </section>
+        <section>
+          <h2>Dalsza nauka</h2>
+          <p><strong>Dokumentacja statsmodels:</strong></p>
+          <p style="font-size: 0.8em">
+            www.statsmodels.org/stable/examples/notebooks/generated/exponential_smoothing.html
+          </p>
+          <p><strong>Książki:</strong></p>
+          <ul>
+            <li>
+              "Forecasting: Principles and Practice" - Hyndman & Athanasopoulos
+            </li>
+            <li>
+              "Time Series Analysis and Its Applications" - Shumway & Stoffer
+            </li>
+          </ul>
+          <p><strong>Alternatywne biblioteki:</strong></p>
+          <ul>
+            <li>Prophet (Facebook)</li>
+            <li>pmdarima (auto_arima)</li>
+            <li>sktime</li>
+          </ul>
+        </section>
+        <section>
+          <h1>Dziękuję za uwagę</h1>
+          <p>Pytania?</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- Reveal.js Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/notes/notes.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/markdown/markdown.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/highlight/highlight.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/math/math.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/search/search.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.5.0/plugin/zoom/zoom.js"></script>
+
+    <script>
+      // Inicjalizacja Reveal.js
+      Reveal.initialize({
+        hash: true,
+        slideNumber: true,
+        transition: "slide",
+        transitionSpeed: "default",
+        backgroundTransition: "fade",
+
+        // Włącz wtyczki
+        plugins: [
+          RevealMarkdown,
+          RevealHighlight,
+          RevealNotes,
+          RevealMath.KaTeX,
+          RevealSearch,
+          RevealZoom,
+        ],
+
+        // Konfiguracja highlight.js
+        highlight: {
+          highlightOnLoad: true,
+        },
+
+        // Responsywność
+        width: 960,
+        height: 700,
+        margin: 0.04,
+        minScale: 0.2,
+        maxScale: 2.0,
+
+        // Kontrolki
+        controls: true,
+        progress: true,
+        center: true,
+        touch: true,
+        loop: false,
+        rtl: false,
+
+        // Klawisze
+        keyboard: true,
+        overview: true,
+
+        // Autoplay (wyłączone)
+        autoSlide: 0,
+        autoSlideStoppable: true,
+
+        // Mouse wheel
+        mouseWheel: false,
+
+        // Preload
+        preloadIframes: null,
+
+        // PDF export
+        pdfMaxPagesPerSlide: 1,
+        pdfSeparateFragments: false,
+      });
+
+      // Dodatkowe skróty klawiszowe
+      document.addEventListener("keydown", function (event) {
+        // 'f' - fullscreen
+        if (event.key === "f") {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+        }
+
+        // 's' - speaker notes (jeśli są)
+        if (event.key === "s") {
+          Reveal.configure({ showNotes: true });
+        }
+
+        // 'o' lub ESC - overview mode
+        if (event.key === "o" || event.key === "Escape") {
+          Reveal.toggleOverview();
+        }
+      });
+
+      // Informacje o nawigacji przy pierwszym slajdzie
+      Reveal.on("ready", (event) => {
+        console.log(
+          "%c Prezentacja gotowa! ",
+          "background: #3498db; color: white; padding: 5px 10px; border-radius: 3px;"
+        );
+        console.log("Nawigacja:");
+        console.log("  → lub Spacja: następny slajd");
+        console.log("  ← : poprzedni slajd");
+        console.log("  f: pełny ekran");
+        console.log("  o lub ESC: tryb przeglądu (overview)");
+        console.log("  s: notatki prelegenta");
+        console.log("  ?: pomoc");
+      });
+    </script>
+  </body>
+</html>
